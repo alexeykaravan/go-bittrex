@@ -138,7 +138,9 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 
 	defer resp.Body.Close()
 	response, err = ioutil.ReadAll(resp.Body)
+
 	//fmt.Println(fmt.Sprintf("reponse %s", response), err)
+
 	if err != nil {
 		return response, err
 	}

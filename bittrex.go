@@ -238,7 +238,7 @@ func (b *Bittrex) GetMarketHistory(market string) (trades []Trade, err error) {
 func (b *Bittrex) BuyLimit(market string, quantity, rate decimal.Decimal) (responce []byte, err error) {
 	r, err := b.client.do("GET", fmt.Sprintf("market/buylimit?market=%s&quantity=%s&rate=%s", market, quantity, rate), "", true)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	return r, nil
@@ -248,24 +248,19 @@ func (b *Bittrex) BuyLimit(market string, quantity, rate decimal.Decimal) (respo
 func (b *Bittrex) SellLimit(market string, quantity, rate decimal.Decimal) (response []byte, err error) {
 	r, err := b.client.do("GET", fmt.Sprintf("market/selllimit?market=%s&quantity=%s&rate=%s", market, quantity, rate), "", true)
 	if err != nil {
-		return
+		return nil, err
 	}
 
 	return r, nil
 }
 
 // CancelOrder is used to cancel a buy or sell order.
-func (b *Bittrex) CancelOrder(orderID string) (err error) {
+func (b *Bittrex) CancelOrder(orderID string) (respone []byte, err error) {
 	r, err := b.client.do("GET", "market/cancel?uuid="+orderID, "", true)
 	if err != nil {
-		return
+		return nil, err
 	}
-	var response jsonResponse
-	if err = json.Unmarshal(r, &response); err != nil {
-		return
-	}
-	err = handleErr(response)
-	return
+	return r, nil
 }
 
 // GetOpenOrders returns orders that you currently have opened.

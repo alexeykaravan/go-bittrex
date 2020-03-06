@@ -57,6 +57,7 @@ func sendStateAsync(dataCh chan<- ExchangeState, st ExchangeState) {
 	case dataCh <- st:
 	default:
 	}
+
 }
 
 func subForMarket(client *signalr.Client, market string) (json.RawMessage, error) {
@@ -73,6 +74,7 @@ func parseStates(messages []json.RawMessage, dataCh chan<- ExchangeState, market
 		if err := json.Unmarshal(msg, &st); err != nil {
 			continue
 		}
+
 		if st.MarketName != market {
 			continue
 		}
@@ -84,7 +86,7 @@ func parseStates(messages []json.RawMessage, dataCh chan<- ExchangeState, market
 // Updates will be sent to dataCh.
 // To stop subscription, send to, or close 'stop'.
 func (b *Bittrex) SubscribeExchangeUpdate(market string, dataCh chan<- ExchangeState, stop <-chan bool) error {
-	const timeout = 5 * time.Second
+	const timeout = 15 * time.Second
 	client := signalr.NewWebsocketClient()
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WS_HUB || method != "updateExchangeState" {

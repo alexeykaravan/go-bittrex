@@ -1,4 +1,4 @@
-// Package Bittrex is an implementation of the Biitrex API in Golang.
+// Package bittrex is an implementation of the Biitrex API in Golang.
 package bittrex
 
 import (

@@ -2,6 +2,7 @@ package bittrex
 
 import "github.com/shopspring/decimal"
 
+// Balance struct
 type Balance struct {
 	Currency      string          `json:"Currency"`
 	Balance       decimal.Decimal `json:"Balance"`

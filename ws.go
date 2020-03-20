@@ -3,7 +3,6 @@ package bittrex
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"crypto/hmac"
@@ -65,6 +64,7 @@ type OrderState struct {
 	AccountUuid string
 	Nonce       int
 	Order       Order3
+	Type        int
 }
 
 // doAsyncTimeout runs f in a different goroutine
@@ -130,13 +130,10 @@ func parseStates(messages []json.RawMessage, dataCh chan<- ExchangeState, market
 
 func parseOrders(messages []json.RawMessage, dataCh chan<- OrderState) {
 	for _, msg := range messages {
-		fmt.Printf("msg: %s\n", string(msg))
-
 		var st OrderState
 		if err := json.Unmarshal(msg, &st); err != nil {
-			fmt.Printf("error : %s\n", err.Error())
+			continue
 		}
-
 		sendOrderAsync(dataCh, st)
 	}
 }
@@ -152,7 +149,6 @@ func (b *Bittrex) SubscribeExchangeUpdate(market string, dataCh chan<- ExchangeS
 		if hub != WS_HUB || method != "updateExchangeState" {
 			return
 		}
-
 		parseStates(messages, dataCh, market)
 	}
 
@@ -235,9 +231,8 @@ func (b *Bittrex) SubscribeOrderUpdate(dataCh chan<- OrderState, stop <-chan boo
 
 	h := hmac.New(sha512.New, []byte(APIsecret))
 	h.Write([]byte(st))
-	sha := hex.EncodeToString(h.Sum(nil))
 
-	_, err = client.CallHub(WS_HUB, "Authenticate", APIkey, sha)
+	_, err = client.CallHub(WS_HUB, "Authenticate", APIkey, hex.EncodeToString(h.Sum(nil)))
 	if err != nil {
 		return err
 	}

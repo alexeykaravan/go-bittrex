@@ -49,7 +49,7 @@ type Order3 struct {
 	Price             decimal.Decimal
 	PricePerUnit      decimal.Decimal
 	Opened            jTime
-	Closed            jTime
+	Closed            *jTime
 	IsOpen            bool
 	CancelInitiated   bool
 	ImmediateOrCancel bool

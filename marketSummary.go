@@ -2,6 +2,7 @@ package bittrex
 
 import "github.com/shopspring/decimal"
 
+// MarketSummary struct
 type MarketSummary struct {
 	MarketName     string          `json:"MarketName"`
 	High           decimal.Decimal `json:"High"`

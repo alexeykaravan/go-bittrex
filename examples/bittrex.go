@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/toorop/go-bittrex"
+
+	"github.com/alexeykaravan/go-bittrex"
 )
 
 const (
-	API_KEY    = ""
-	API_SECRET = ""
+	API_KEY    = "8fff58a2df43461a9f81f08ffb2b0fe0"
+	API_SECRET = "d38d6d107c36470c93a25f09e46ea319"
 )
 
 func main() {
@@ -15,16 +16,14 @@ func main() {
 	bittrex := bittrex.New(API_KEY, API_SECRET)
 
 	// Get markets
-	/*
-		markets, err := bittrex.GetMarkets()
-		fmt.Println(err, markets)
-	*/
 
-	// Get Ticker (BTC-VTC)
-	/*
-		ticker, err := bittrex.GetTicker("BTC-DRK")
-		fmt.Println(err, ticker)
+	/*markets, err := bittrex.GetMarkets()
+	fmt.Println(err, markets)
 	*/
+	// Get Ticker (BTC-VTC)
+
+	//	ticker, err := bittrex.GetTicker("BTC-USD1")
+	//	fmt.Println(err, ticker)
 
 	// Get Distribution (JBS)
 	/*
@@ -87,17 +86,15 @@ func main() {
 	*/
 
 	// Get open orders
-	/*
-		orders, err := bittrex.GetOpenOrders("BTC-DOGE")
-		fmt.Println(err, orders)
-	*/
+
+	orders, err := bittrex.GetOpenOrders("")
+	fmt.Println(err, orders)
 
 	// Account
 	// Get balances
-	/*
-		balances, err := bittrex.GetBalances()
-		fmt.Println(err, balances)
-	*/
+
+	//balances, err := bittrex.GetBalances()
+	//fmt.Println(err, balances)
 
 	// Get balance
 	/*

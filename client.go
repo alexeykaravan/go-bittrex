@@ -102,7 +102,7 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 	if strings.HasPrefix(resource, "http") {
 		rawurl = resource
 	} else {
-		rawurl = fmt.Sprintf("%s%s/%s", API_BASE, API_VERSION, resource)
+		rawurl = fmt.Sprintf("%s%s/%s", APIBASE, APIVERSION, resource)
 	}
 
 	req, err := http.NewRequest(method, rawurl, strings.NewReader(payload))
@@ -120,15 +120,25 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 			err = errors.New("You need to set API Key and API Secret to call this method")
 			return
 		}
-		nonce := time.Now().UnixNano()
-		q := req.URL.Query()
-		q.Set("apikey", c.apiKey)
-		q.Set("nonce", fmt.Sprintf("%d", nonce))
-		req.URL.RawQuery = q.Encode()
+
+		apiTimestamp := fmt.Sprintf("%d", time.Now().UnixNano()/1000000)
+
+		sha512Bytes := sha512.Sum512([]byte(payload))
+		apiContentHash := hex.EncodeToString(sha512Bytes[:])
+
+		req.Header.Add("Api-Key", c.apiKey)
+		req.Header.Add("Api-Timestamp", apiTimestamp)
+		req.Header.Add("Api-Content-Hash", apiContentHash)
+
+		preSign := strings.Join([]string{apiTimestamp, rawurl, method, apiContentHash}, "")
+
 		mac := hmac.New(sha512.New, []byte(c.apiSecret))
-		_, err = mac.Write([]byte(req.URL.String()))
+		_, err = mac.Write([]byte(preSign))
 		sig := hex.EncodeToString(mac.Sum(nil))
-		req.Header.Add("apisign", sig)
+		req.Header.Add("Api-Signature", sig)
+
+		fmt.Printf("%v", req)
+
 	}
 
 	resp, err := c.doTimeoutRequest(connectTimer, req)
@@ -138,8 +148,6 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 
 	defer resp.Body.Close()
 	response, err = ioutil.ReadAll(resp.Body)
-
-	//fmt.Println(fmt.Sprintf("reponse %s", response), err)
 
 	if err != nil {
 		return response, err

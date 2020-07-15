@@ -106,12 +106,12 @@ func sendOrderAsync(dataCh chan<- OrderState, st OrderState) {
 }
 
 func subForMarket(client *signalr.Client, market string) (json.RawMessage, error) {
-	_, err := client.CallHub(WS_HUB, "SubscribeToExchangeDeltas", market)
+	_, err := client.CallHub(WSHUB, "SubscribeToExchangeDeltas", market)
 	if err != nil {
 		return json.RawMessage{}, err
 	}
 
-	return client.CallHub(WS_HUB, "QueryExchangeState", market)
+	return client.CallHub(WSHUB, "QueryExchangeState", market)
 }
 
 func parseStates(messages []json.RawMessage, dataCh chan<- ExchangeState, market string) {
@@ -146,7 +146,7 @@ func (b *Bittrex) SubscribeExchangeUpdate(market string, dataCh chan<- ExchangeS
 	client := signalr.NewWebsocketClient()
 
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
-		if hub != WS_HUB || method != "updateExchangeState" {
+		if hub != WSHUB || method != "updateExchangeState" {
 			return
 		}
 		parseStates(messages, dataCh, market)
@@ -154,7 +154,7 @@ func (b *Bittrex) SubscribeExchangeUpdate(market string, dataCh chan<- ExchangeS
 
 	err := doAsyncTimeout(
 		func() error {
-			return client.Connect("https", WS_BASE, []string{WS_HUB})
+			return client.Connect("https", WSBASE, []string{WSHUB})
 		}, func(err error) {
 			if err == nil {
 				client.Close()
@@ -200,14 +200,14 @@ func (b *Bittrex) SubscribeOrderUpdate(dataCh chan<- OrderState, stop <-chan boo
 
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 
-		if hub != WS_HUB || method != "updateOrderState" {
+		if hub != WSHUB || method != "updateOrderState" {
 			return
 		}
 		parseOrders(messages, dataCh)
 	}
 	err := doAsyncTimeout(
 		func() error {
-			return client.Connect("https", WS_BASE, []string{WS_HUB})
+			return client.Connect("https", WSBASE, []string{WSHUB})
 		}, func(err error) {
 			if err == nil {
 				client.Close()
@@ -219,7 +219,7 @@ func (b *Bittrex) SubscribeOrderUpdate(dataCh chan<- OrderState, stop <-chan boo
 	defer client.Close()
 
 	var r json.RawMessage
-	r, err = client.CallHub(WS_HUB, "GetAuthContext", APIkey)
+	r, err = client.CallHub(WSHUB, "GetAuthContext", APIkey)
 	if err != nil {
 		return err
 	}
@@ -232,7 +232,7 @@ func (b *Bittrex) SubscribeOrderUpdate(dataCh chan<- OrderState, stop <-chan boo
 	h := hmac.New(sha512.New, []byte(APIsecret))
 	h.Write([]byte(st))
 
-	_, err = client.CallHub(WS_HUB, "Authenticate", APIkey, hex.EncodeToString(h.Sum(nil)))
+	_, err = client.CallHub(WSHUB, "Authenticate", APIkey, hex.EncodeToString(h.Sum(nil)))
 	if err != nil {
 		return err
 	}

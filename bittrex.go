@@ -4,12 +4,9 @@ package bittrex
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/shopspring/decimal"
 )
 
 const (
@@ -83,21 +80,16 @@ func (b *Bittrex) GetTicker(market string) (ticker Ticker, err error) {
 
 // Market
 
-// BuyLimit is used to place a limited buy order in a specific market.
-func (b *Bittrex) BuyLimit(market, force string, quantity, rate decimal.Decimal) (responce []byte, err error) {
-	r, err := b.client.do("GET", fmt.Sprintf("market/buylimit?market=%s&quantity=%s&rate=%s&timeInForce=%s", market, quantity, rate, force), "", true)
+// NewOrder is used to place a order in a specific market.
+func (b *Bittrex) NewOrder(order NewOrder) (response []byte, err error) {
+	data, err := json.Marshal(order)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	return r, nil
-}
-
-// SellLimit is used to place a limited sell order in a specific market.
-func (b *Bittrex) SellLimit(market, force string, quantity, rate decimal.Decimal) (response []byte, err error) {
-	r, err := b.client.do("GET", fmt.Sprintf("market/selllimit?market=%s&quantity=%s&rate=%s&timeInForce=%s", market, quantity, rate, force), "", true)
+	r, err := b.client.do("POST", "orders", string(data), true)
 	if err != nil {
-		return nil, err
+		return r, err
 	}
 
 	return r, nil
@@ -106,10 +98,7 @@ func (b *Bittrex) SellLimit(market, force string, quantity, rate decimal.Decimal
 // CancelOrder is used to cancel a buy or sell order.
 func (b *Bittrex) CancelOrder(orderID string) (respone []byte, err error) {
 	r, err := b.client.do("DELETE", "orders/"+orderID, "", true)
-	if err != nil {
-		return nil, err
-	}
-	return r, nil
+	return r, err
 }
 
 // GetOpenOrders returns orders that you currently have opened.

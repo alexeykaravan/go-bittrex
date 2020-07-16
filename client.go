@@ -61,9 +61,9 @@ func (c client) dumpResponse(r *http.Response) {
 	}
 	dump, err := httputil.DumpResponse(r, true)
 	if err != nil {
-		log.Print("dumpResponse err:", err)
+		fmt.Print("dumpResponse err:", err)
 	} else {
-		log.Print("dumpResponse ok:", string(dump))
+		fmt.Print("dumpResponse ok:", string(dump))
 	}
 }
 
@@ -109,9 +109,11 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 	if err != nil {
 		return
 	}
+
 	if method == "POST" || method == "PUT" {
 		req.Header.Add("Content-Type", "application/json;charset=utf-8")
 	}
+
 	req.Header.Add("Accept", "application/json")
 
 	// Auth
@@ -136,9 +138,6 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 		_, err = mac.Write([]byte(preSign))
 		sig := hex.EncodeToString(mac.Sum(nil))
 		req.Header.Add("Api-Signature", sig)
-
-		fmt.Printf("%v", req)
-
 	}
 
 	resp, err := c.doTimeoutRequest(connectTimer, req)
@@ -148,12 +147,17 @@ func (c *client) do(method string, resource string, payload string, authNeeded b
 
 	defer resp.Body.Close()
 	response, err = ioutil.ReadAll(resp.Body)
-
 	if err != nil {
-		return response, err
+		return nil, err
 	}
-	if resp.StatusCode != 200 {
+
+	if resp.StatusCode != 201 && method == "POST" {
 		err = errors.New(resp.Status)
 	}
+
+	if resp.StatusCode != 200 && (method == "GET" || method == "DELETE") {
+		err = errors.New(resp.Status)
+	}
+
 	return response, err
 }

@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	API_KEY    = "8fff58a2df43461a9f81f08ffb2b0fe0"
-	API_SECRET = "d38d6d107c36470c93a25f09e46ea319"
+	API_KEY    = ""
+	API_SECRET = ""
 )
 
 func main() {

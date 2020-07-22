@@ -2,6 +2,7 @@ package bittrex
 
 import "github.com/shopspring/decimal"
 
+// Currency struct
 type Currency struct {
 	Currency        string          `json:"Currency"`
 	CurrencyLong    string          `json:"CurrencyLong"`

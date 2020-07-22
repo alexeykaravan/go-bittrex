@@ -17,7 +17,7 @@ const (
 	//WSBASE Bittrex WS API endpoint
 	WSBASE = "socket-v3.bittrex.com"
 	//WSHUB SignalR main hub
-	WSHUB = "CoreHub"
+	WSHUB = "c3"
 )
 
 // New returns an instantiated bittrex struct
@@ -88,16 +88,14 @@ func (b *Bittrex) NewOrder(order NewOrder) (response []byte, err error) {
 	}
 
 	r, err := b.client.do("POST", "orders", string(data), true)
-	if err != nil {
-		return r, err
-	}
 
-	return r, nil
+	return r, err
 }
 
 // CancelOrder is used to cancel a buy or sell order.
 func (b *Bittrex) CancelOrder(orderID string) (respone []byte, err error) {
 	r, err := b.client.do("DELETE", "orders/"+orderID, "", true)
+
 	return r, err
 }
 

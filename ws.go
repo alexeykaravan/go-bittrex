@@ -1,16 +1,24 @@
 package bittrex
 
 import (
+	"bytes"
+	"compress/gzip"
+	"compress/zlib"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"io/ioutil"
+	"strings"
 	"time"
 
 	"crypto/hmac"
 	"crypto/sha512"
 	"encoding/hex"
 
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
-
 	"github.com/thebotguys/signalr"
 )
 
@@ -72,6 +80,7 @@ type OrderState struct {
 //	otherwise it returns "operation timeout" error, and calls tmFunc after f returns.
 func doAsyncTimeout(f func() error, tmFunc func(error), timeout time.Duration) error {
 	errs := make(chan error)
+
 	go func() {
 		err := f()
 		select {
@@ -82,6 +91,7 @@ func doAsyncTimeout(f func() error, tmFunc func(error), timeout time.Duration) e
 			}
 		}
 	}()
+
 	select {
 	case err := <-errs:
 		return err
@@ -106,7 +116,7 @@ func sendOrderAsync(dataCh chan<- OrderState, st OrderState) {
 }
 
 func subForMarket(client *signalr.Client, market string) (json.RawMessage, error) {
-	_, err := client.CallHub(WSHUB, "SubscribeToExchangeDeltas", market)
+	_, err := client.CallHub("", `{"H":"c3","M":"Subscribe","A":[["ticker_BTC-USD"]],"I":1}`)
 	if err != nil {
 		return json.RawMessage{}, err
 	}
@@ -205,6 +215,7 @@ func (b *Bittrex) SubscribeOrderUpdate(dataCh chan<- OrderState, stop <-chan boo
 		}
 		parseOrders(messages, dataCh)
 	}
+
 	err := doAsyncTimeout(
 		func() error {
 			return client.Connect("https", WSBASE, []string{WSHUB})
@@ -241,5 +252,102 @@ func (b *Bittrex) SubscribeOrderUpdate(dataCh chan<- OrderState, stop <-chan boo
 	case <-stop:
 	case <-client.DisconnectedChannel:
 	}
+	return nil
+}
+
+func gunzipWrite(w io.Writer, data []byte) error {
+	// Write gzipped data to the client
+	gr, err := gzip.NewReader(bytes.NewBuffer(data))
+	defer gr.Close()
+	data, err = ioutil.ReadAll(gr)
+	if err != nil {
+		return err
+	}
+
+	_, err = io.Copy(w, gr)
+	return err
+}
+
+// SubscribeForMessages func
+func (b *Bittrex) SubscribeForMessages(dataCh chan<- json.RawMessage, APIkey, APIsecret string) error {
+	const timeout = 15 * time.Second
+	client := signalr.NewWebsocketClient()
+
+	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
+		for _, msg := range messages {
+
+			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))
+			if err != nil {
+				fmt.Printf("DecodeString error: %s %s\n", err.Error(), string(msg))
+				continue
+			}
+
+			r, err := zlib.NewReader(bytes.NewReader(append([]byte{120, 156}, dbuf...)))
+			if err != nil {
+				fmt.Printf("1 %s -  %v\n", err.Error(), dbuf)
+				continue
+			}
+			defer r.Close()
+
+			var out bytes.Buffer
+			io.Copy(&out, r)
+
+			fmt.Printf("3 %s %s %s\n", hub, method, out.String())
+
+		}
+	}
+
+	client.OnMessageError = func(err error) {
+		fmt.Println("ERROR OCCURRED: ", err)
+	}
+
+	err := doAsyncTimeout(
+		func() error {
+			return client.Connect("https", WSBASE, []string{WSHUB})
+		}, func(err error) {
+			if err == nil {
+				client.Close()
+			}
+		}, timeout)
+	if err != nil {
+		return err
+	}
+
+	defer client.Close()
+
+	apiTimestamp := time.Now().UnixNano() / 1000000
+	UUID := uuid.New().String()
+
+	preSign := strings.Join([]string{fmt.Sprintf("%d", apiTimestamp), UUID}, "")
+
+	mac := hmac.New(sha512.New, []byte(APIsecret))
+	_, err = mac.Write([]byte(preSign))
+	sig := hex.EncodeToString(mac.Sum(nil))
+
+	msg, err := client.CallHub(WSHUB, "Authenticate", APIkey, apiTimestamp, UUID, sig)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Authenticate %s\n", msg)
+
+	msg, err = client.CallHub(WSHUB, "IsAuthenticated")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("IsAuthenticated %s\n", msg)
+
+	d, err := client.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_BTC-USD_25", "heartbeat"})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Subscribe %s\n", string(d))
+
+	select {
+	case <-client.DisconnectedChannel:
+	}
+
 	return nil
 }

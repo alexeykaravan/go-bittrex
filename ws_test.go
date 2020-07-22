@@ -27,7 +27,7 @@ func TestBittrexSubscribeOrderBook(t *testing.T) {
 		}
 	}()
 	go func() {
-		errCh <- bt.SubscribeExchangeUpdate("USDT-BTC", ch, nil)
+		errCh <- bt.SubscribeExchangeUpdate("BTC-USD", ch, nil)
 	}()
 	select {
 	case <-time.After(time.Second * 6):

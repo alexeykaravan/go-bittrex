@@ -5,7 +5,8 @@ import (
 	"time"
 )
 
-var CANDLE_INTERVALS = map[string]bool{
+// CANDLEINTERVALS variable
+var CANDLEINTERVALS = map[string]bool{
 	"oneMin":    true,
 	"fiveMin":   true,
 	"thirtyMin": true,
@@ -13,11 +14,11 @@ var CANDLE_INTERVALS = map[string]bool{
 	"day":       true,
 }
 
-type CandleTime struct {
+type candleTime struct {
 	time.Time
 }
 
-func (t *CandleTime) UnmarshalJSON(b []byte) error {
+func (t *candleTime) UnmarshalJSON(b []byte) error {
 	if len(b) < 2 {
 		return fmt.Errorf("could not parse time %s", string(b))
 	}

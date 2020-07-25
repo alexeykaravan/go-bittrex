@@ -4,12 +4,15 @@ import "github.com/shopspring/decimal"
 
 //OrderBook struct
 type OrderBook struct {
-	Buy  []Orderb `json:"buy"`
-	Sell []Orderb `json:"sell"`
+	MarketSymbol string       `json:"marketSymbol"`
+	Depth        int          `json:"depth"`
+	Sequence     int          `json:"sequence"`
+	BidDeltas    []OrderDelta `json:"bidDeltas"`
+	AskDeltas    []OrderDelta `json:"askDeltas"`
 }
 
-//Orderb struct
-type Orderb struct {
-	Quantity decimal.Decimal `json:"Quantity"`
-	Rate     decimal.Decimal `json:"Rate"`
+//OrderDelta struct
+type OrderDelta struct {
+	Quantity decimal.Decimal `json:"quantity"`
+	Rate     decimal.Decimal `json:"rate"`
 }

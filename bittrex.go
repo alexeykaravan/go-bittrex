@@ -3,7 +3,6 @@ package bittrex
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -18,6 +17,13 @@ const (
 	WSBASE = "socket-v3.bittrex.com"
 	//WSHUB SignalR main hub
 	WSHUB = "c3"
+
+	//ORDERBOOK const
+	ORDERBOOK = "orderBook"
+	//TICKER const
+	TICKER = "ticker"
+	//ORDER const
+	ORDER = "order"
 )
 
 // New returns an instantiated bittrex struct
@@ -28,7 +34,7 @@ func New(apiKey, apiSecret string) *Bittrex {
 
 // NewWithCustomHTTPClient returns an instantiated bittrex struct with custom http client
 func NewWithCustomHTTPClient(apiKey, apiSecret string, httpClient *http.Client) *Bittrex {
-	client := NewClientWithCustomHttpConfig(apiKey, apiSecret, httpClient)
+	client := NewClientWithCustomHTTPConfig(apiKey, apiSecret, httpClient)
 	return &Bittrex{client}
 }
 
@@ -38,17 +44,9 @@ func NewWithCustomTimeout(apiKey, apiSecret string, timeout time.Duration) *Bitt
 	return &Bittrex{client}
 }
 
-// handleErr gets JSON response from Bittrex API en deal with error
-func handleErr(r jsonResponse) error {
-	if !r.Success {
-		return errors.New(r.Message)
-	}
-	return nil
-}
-
 // Bittrex represent a Bittrex client
 type Bittrex struct {
-	client *client
+	client *Client
 }
 
 // SetDebug set enable/disable http request/response dump

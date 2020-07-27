@@ -64,6 +64,19 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 	b.client.wsClient = signalr.NewWebsocketClient()
 
 	b.client.wsClient.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
+
+		switch method {
+		case ORDERBOOK, TICKER, ORDER:
+		case AUTHEXPIRED:
+			_, err := b.authentication()
+			if err != nil {
+				fmt.Printf("authentication error: %s\n", err.Error())
+			}
+		default:
+			//handle unsupported type
+			fmt.Printf("unsupported message type: %s\n", method)
+		}
+
 		for _, msg := range messages {
 
 			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))

@@ -24,6 +24,10 @@ const (
 	TICKER = "ticker"
 	//ORDER const
 	ORDER = "order"
+	//HEARTBEAT const
+	HEARTBEAT = "heartbeat"
+	//AUTHEXPIRED const
+	AUTHEXPIRED = "authenticationExpiring"
 )
 
 // New returns an instantiated bittrex struct

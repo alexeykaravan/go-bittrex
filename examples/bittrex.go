@@ -17,9 +17,14 @@ func main() {
 
 	// Get markets
 
-	/*markets, err := bittrex.GetMarkets()
-	fmt.Println(err, markets)
-	*/
+	markets, _ := bittrex.GetMarkets()
+
+	for _, m := range markets {
+		if m.Status == "ONLINE" {
+			fmt.Printf("%s %s\n", m.Symbol, m.QuoteCurrencySymbol)
+		}
+	}
+
 	// Get Ticker (BTC-VTC)
 
 	//	ticker, err := bittrex.GetTicker("BTC-USD1")
@@ -87,8 +92,8 @@ func main() {
 
 	// Get open orders
 
-	orders, err := bittrex.GetOpenOrders("")
-	fmt.Println(err, orders)
+	//	orders, err := bittrex.GetOpenOrders("")
+	//	fmt.Println(err, orders)
 
 	// Account
 	// Get balances

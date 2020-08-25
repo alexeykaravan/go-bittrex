@@ -12,8 +12,6 @@ import (
 	"net/http/httputil"
 	"strings"
 	"time"
-
-	"github.com/thebotguys/signalr"
 )
 
 //Client struct
@@ -23,12 +21,11 @@ type Client struct {
 	httpClient  *http.Client
 	httpTimeout time.Duration
 	debug       bool
-	wsClient    *signalr.Client
 }
 
 // NewClient return a new Bittrex HTTP client
 func NewClient(apiKey, apiSecret string) (c *Client) {
-	return &Client{apiKey, apiSecret, &http.Client{}, 30 * time.Second, false, nil}
+	return &Client{apiKey, apiSecret, &http.Client{}, 30 * time.Second, false}
 }
 
 // NewClientWithCustomHTTPConfig returns a new Bittrex HTTP client using the predefined http client
@@ -37,12 +34,12 @@ func NewClientWithCustomHTTPConfig(apiKey, apiSecret string, httpClient *http.Cl
 	if timeout <= 0 {
 		timeout = 30 * time.Second
 	}
-	return &Client{apiKey, apiSecret, httpClient, timeout, false, nil}
+	return &Client{apiKey, apiSecret, httpClient, timeout, false}
 }
 
 // NewClientWithCustomTimeout returns a new Bittrex HTTP client with custom timeout
 func NewClientWithCustomTimeout(apiKey, apiSecret string, timeout time.Duration) (c *Client) {
-	return &Client{apiKey, apiSecret, &http.Client{}, timeout, false, nil}
+	return &Client{apiKey, apiSecret, &http.Client{}, timeout, false}
 }
 
 func (c Client) dumpRequest(r *http.Request) {

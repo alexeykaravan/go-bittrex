@@ -16,7 +16,7 @@ const (
 	//WSBASE Bittrex WS API endpoint
 	WSBASE = "socket-v3.bittrex.com"
 	//WSHUB SignalR main hub
-	WSHUB = "c3"
+	WSHUB = "C3"
 
 	//ORDERBOOK const
 	ORDERBOOK = "orderBook"

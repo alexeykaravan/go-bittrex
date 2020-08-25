@@ -11,11 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"crypto/hmac"
-	"crypto/sha512"
-	"encoding/hex"
-
-	"github.com/google/uuid"
 	"github.com/thebotguys/signalr"
 )
 
@@ -61,9 +56,9 @@ func doAsyncTimeout(f func() error, tmFunc func(error), timeout time.Duration) e
 // StartListener func
 func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 	const timeout = 15 * time.Second
-	b.client.wsClient = signalr.NewWebsocketClient()
+	client := signalr.NewWebsocketClient()
 
-	b.client.wsClient.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
+	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 
 		switch method {
 		case ORDERBOOK, TICKER, ORDER:
@@ -116,16 +111,16 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 		}
 	}
 
-	b.client.wsClient.OnMessageError = func(err error) {
+	client.OnMessageError = func(err error) {
 		fmt.Printf("ERROR OCCURRED: %s\n", err.Error())
 	}
 
 	err := doAsyncTimeout(
 		func() error {
-			return b.client.wsClient.Connect("https", WSBASE, []string{WSHUB})
+			return client.Connect("https", WSBASE, []string{WSHUB})
 		}, func(err error) {
 			if err == nil {
-				b.client.wsClient.Close()
+				client.Close()
 			}
 		}, timeout)
 	if err != nil {
@@ -137,12 +132,12 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 		return err
 	}
 
-	_, err = b.client.wsClient.CallHub(WSHUB, "IsAuthenticated")
+	_, err = client.CallHub(WSHUB, "IsAuthenticated")
 	if err != nil {
 		return err
 	}
 
-	_, err = b.client.wsClient.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "order"})
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "order"})
 	if err != nil {
 		return err
 	}
@@ -163,93 +158,101 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 	return nil
 }
 
-//SubscribeOrderbook func
-func (b *Bittrex) SubscribeOrderbook(market string) error {
-
-	msg, err := b.client.wsClient.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_" + market + "_25"})
-	if err != nil {
-		return err
-	}
-
-	r := []Responce{}
-
-	err = json.Unmarshal(msg, &r)
-	if err != nil {
-		return err
-	}
-
-	for _, i := range r {
-		if !i.Success {
-			return fmt.Errorf(fmt.Sprintf("Subscribe orderbook error: %v", i.ErrorCode))
-		}
-	}
-
-	return nil
-}
-
-//SubscribeTicker func
-func (b *Bittrex) SubscribeTicker(market string) error {
-
-	msg, err := b.client.wsClient.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market})
-	if err != nil {
-		return err
-	}
-
-	r := []Responce{}
-
-	err = json.Unmarshal(msg, &r)
-	if err != nil {
-		return err
-	}
-
-	for _, i := range r {
-		if !i.Success {
-			return fmt.Errorf(fmt.Sprintf("Subscribe ticker error: %v", i.ErrorCode))
-		}
-	}
-
-	return nil
-}
-
-//Subscribe func
-func (b *Bittrex) Subscribe(market string) error {
-
-	msg, err := b.client.wsClient.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market, "orderbook_" + market + "_25"})
-	if err != nil {
-		return err
-	}
-
-	r := []Responce{}
-
-	err = json.Unmarshal(msg, &r)
-	if err != nil {
-		return err
-	}
-
-	for _, i := range r {
-		if !i.Success {
-			return fmt.Errorf(fmt.Sprintf("Subscribe error: %v", i.ErrorCode))
-		}
-	}
-
-	return nil
-}
-
 //Authentication func
 func (b *Bittrex) Authentication() ([]byte, error) {
-	apiTimestamp := time.Now().UnixNano() / 1000000
-	UUID := uuid.New().String()
+	//apiTimestamp := time.Now().UnixNano() / 1000000
+	//UUID := uuid.New().String()
 
-	preSign := strings.Join([]string{fmt.Sprintf("%d", apiTimestamp), UUID}, "")
+	//preSign := strings.Join([]string{fmt.Sprintf("%d", apiTimestamp), UUID}, "")
 
-	mac := hmac.New(sha512.New, []byte(b.client.apiSecret))
-	_, err := mac.Write([]byte(preSign))
-	sig := hex.EncodeToString(mac.Sum(nil))
+	//mac := hmac.New(sha512.New, []byte(b.client.apiSecret))
+	//_, err := mac.Write([]byte(preSign))
+	//sig := hex.EncodeToString(mac.Sum(nil))
 
-	msg, err := b.client.wsClient.CallHub(WSHUB, "Authenticate", b.client.apiKey, apiTimestamp, UUID, sig)
+	/*msg, err := client.CallHub(WSHUB, "Authenticate", b.client.apiKey, apiTimestamp, UUID, sig)
 	if err != nil {
 		return nil, err
 	}
+	*/
 
-	return msg, nil
+	return nil, nil
+}
+
+// SubscribeExchangeUpdates subscribes for updates of the market.
+// Updates will be sent to dataCh.
+// To stop subscription, send to, or close 'stop'.
+func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, stop <-chan bool) error {
+	const timeout = 5 * time.Second
+	client := signalr.NewWebsocketClient()
+	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
+
+		if hub != WSHUB {
+			return
+		}
+
+		p := Packet{Method: method}
+
+		for _, msg := range messages {
+
+			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))
+			if err != nil {
+				fmt.Printf("DecodeString error: %s %s\n", err.Error(), string(msg))
+				continue
+			}
+
+			r, err := zlib.NewReader(bytes.NewReader(append([]byte{120, 156}, dbuf...)))
+			if err != nil {
+				fmt.Printf("unzip error %s %s \n", err.Error(), string(msg))
+				continue
+			}
+			defer r.Close()
+
+			var out bytes.Buffer
+			io.Copy(&out, r)
+
+			switch method {
+			case ORDERBOOK:
+				json.Unmarshal([]byte(out.String()), &p.OrderBook)
+			case TICKER:
+				json.Unmarshal([]byte(out.String()), &p.Ticker)
+			}
+
+			select {
+			case dataCh <- p:
+			default:
+				fmt.Printf("missed message: %v", p)
+			}
+		}
+	}
+
+	client.OnMessageError = func(err error) {
+		fmt.Printf("ERROR OCCURRED: %s\n", err.Error())
+	}
+
+	err := doAsyncTimeout(
+		func() error {
+			return client.Connect("https", WSBASE, []string{WSHUB})
+		}, func(err error) {
+			if err == nil {
+				client.Close()
+			}
+		}, timeout)
+	if err != nil {
+		return err
+	}
+
+	defer client.Close()
+
+	msg, err := client.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market, "orderbook_" + market + "_25"})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Subscribe: %s\n", msg)
+
+	select {
+	case <-stop:
+	case <-client.DisconnectedChannel:
+	}
+	return nil
 }

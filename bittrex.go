@@ -3,7 +3,9 @@ package bittrex
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -77,6 +79,31 @@ func (b *Bittrex) GetTicker(market string) (ticker Ticker, err error) {
 	}
 
 	err = json.Unmarshal(r, &ticker)
+	return
+}
+
+// GetOrderBook is used to get the current orderbook values for a market.
+func (b *Bittrex) GetOrderBook(book *OrderBook) (err error) {
+	resp, err := b.client.do2("markets/" + strings.ToUpper(book.MarketSymbol) + "/orderbook?depth=" + strconv.Itoa(book.Depth))
+	if err != nil {
+		return
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return
+	}
+
+	book2 := &OrderBook2{}
+	err = json.Unmarshal(body, book2)
+	if err != nil {
+		return
+	}
+
+	book.Sequence, _ = strconv.Atoi(resp.Header.Get("Sequence"))
+	book.BidDeltas = book2.BidDeltas
+	book.AskDeltas = book2.AskDeltas
+
 	return
 }
 

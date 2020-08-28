@@ -16,3 +16,9 @@ type OrderDelta struct {
 	Quantity decimal.Decimal `json:"quantity"`
 	Rate     decimal.Decimal `json:"rate"`
 }
+
+//OrderBook2 struct
+type OrderBook2 struct {
+	BidDeltas []OrderDelta `json:"bid"`
+	AskDeltas []OrderDelta `json:"ask"`
+}

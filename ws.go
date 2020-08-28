@@ -181,7 +181,7 @@ func (b *Bittrex) Authentication() ([]byte, error) {
 // SubscribeExchangeUpdates subscribes for updates of the market.
 // Updates will be sent to dataCh.
 // To stop subscription, send to, or close 'stop'.
-func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, stop <-chan bool) error {
+func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, stop <-chan bool, orderbook bool) error {
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
@@ -243,12 +243,17 @@ func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, 
 
 	defer client.Close()
 
-	msg, err := client.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market, "orderbook_" + market + "_25"})
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market})
 	if err != nil {
 		return err
 	}
 
-	fmt.Printf("Subscribe: %s\n", msg)
+	if orderbook {
+		_, err := client.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_" + market + "_25"})
+		if err != nil {
+			return err
+		}
+	}
 
 	select {
 	case <-stop:

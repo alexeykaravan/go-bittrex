@@ -162,3 +162,34 @@ func (c *Client) do(method string, resource string, payload string, authNeeded b
 
 	return response, err
 }
+
+// do2 prepare and process HTTP request to Bittrex API
+func (c *Client) do2(resource string) (*http.Response, error) {
+	connectTimer := time.NewTimer(c.httpTimeout)
+
+	var rawurl string
+	if strings.HasPrefix(resource, "http") {
+		rawurl = resource
+	} else {
+		rawurl = fmt.Sprintf("%s%s/%s", APIBASE, APIVERSION, resource)
+	}
+
+	req, err := http.NewRequest("GET", rawurl, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Accept", "application/json")
+
+	resp, err := c.doTimeoutRequest(connectTimer, req)
+	if err != nil {
+		return nil, err
+
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, errors.New(resp.Status)
+	}
+
+	return resp, err
+}

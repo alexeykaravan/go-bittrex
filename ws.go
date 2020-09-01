@@ -3,7 +3,10 @@ package bittrex
 import (
 	"bytes"
 	"compress/zlib"
+	"crypto/hmac"
+	"crypto/sha512"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -11,16 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/thebotguys/signalr"
 )
-
-// Packet contains
-type Packet struct {
-	Method    string
-	OrderBook OrderBook
-	Ticker    Ticker
-	Order     Order
-}
 
 //Responce struct
 type Responce struct {
@@ -54,7 +50,7 @@ func doAsyncTimeout(f func() error, tmFunc func(error), timeout time.Duration) e
 }
 
 // StartListener func
-func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
+func (b *Bittrex) StartListener(dataCh chan<- Order) error {
 	const timeout = 15 * time.Second
 	client := signalr.NewWebsocketClient()
 
@@ -89,15 +85,11 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 			var out bytes.Buffer
 			io.Copy(&out, r)
 
-			p := Packet{Method: method}
+			p := Order{}
 
 			switch method {
-			case ORDERBOOK:
-				json.Unmarshal([]byte(out.String()), &p.OrderBook)
-			case TICKER:
-				json.Unmarshal([]byte(out.String()), &p.Ticker)
 			case ORDER:
-				json.Unmarshal([]byte(out.String()), &p.Order)
+				json.Unmarshal([]byte(out.String()), &p)
 			default:
 				//handle unsupported type
 				//fmt.Printf("unsupported message type: %v", p.Method)
@@ -127,7 +119,7 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 		return err
 	}
 
-	_, err = b.Authentication()
+	_, err = b.Authentication(client)
 	if err != nil {
 		return err
 	}
@@ -146,7 +138,7 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 		ticker := time.NewTicker(8 * time.Minute)
 
 		for {
-			auth, err := b.Authentication()
+			auth, err := b.Authentication(client)
 			if err != nil {
 				fmt.Printf("authentication error: %s - %s\n", auth, err)
 			}
@@ -159,41 +151,37 @@ func (b *Bittrex) StartListener(dataCh chan<- Packet) error {
 }
 
 //Authentication func
-func (b *Bittrex) Authentication() ([]byte, error) {
-	//apiTimestamp := time.Now().UnixNano() / 1000000
-	//UUID := uuid.New().String()
+func (b *Bittrex) Authentication(c *signalr.Client) ([]byte, error) {
+	apiTimestamp := time.Now().UnixNano() / 1000000
+	UUID := uuid.New().String()
 
-	//preSign := strings.Join([]string{fmt.Sprintf("%d", apiTimestamp), UUID}, "")
+	preSign := strings.Join([]string{fmt.Sprintf("%d", apiTimestamp), UUID}, "")
 
-	//mac := hmac.New(sha512.New, []byte(b.client.apiSecret))
-	//_, err := mac.Write([]byte(preSign))
-	//sig := hex.EncodeToString(mac.Sum(nil))
+	mac := hmac.New(sha512.New, []byte(b.client.apiSecret))
+	_, err := mac.Write([]byte(preSign))
+	sig := hex.EncodeToString(mac.Sum(nil))
 
-	/*msg, err := client.CallHub(WSHUB, "Authenticate", b.client.apiKey, apiTimestamp, UUID, sig)
+	_, err = c.CallHub(WSHUB, "Authenticate", b.client.apiKey, apiTimestamp, UUID, sig)
 	if err != nil {
 		return nil, err
 	}
-	*/
 
 	return nil, nil
 }
 
-// SubscribeExchangeUpdates subscribes for updates of the market.
+// SubscribeUpdates subscribes for updates of the market.
 // Updates will be sent to dataCh.
 // To stop subscription, send to, or close 'stop'.
-func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, stop <-chan bool, orderbook bool) error {
+func (b *Bittrex) SubscribeUpdates(market string, ticker chan<- Ticker, orderbook chan<- OrderBook) error {
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
-	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 
+	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WSHUB {
 			return
 		}
 
-		p := Packet{Method: method}
-
 		for _, msg := range messages {
-
 			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))
 			if err != nil {
 				fmt.Printf("DecodeString error: %s %s\n", err.Error(), string(msg))
@@ -212,15 +200,22 @@ func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, 
 
 			switch method {
 			case ORDERBOOK:
-				json.Unmarshal([]byte(out.String()), &p.OrderBook)
-			case TICKER:
-				json.Unmarshal([]byte(out.String()), &p.Ticker)
-			}
+				p := OrderBook{}
+				json.Unmarshal([]byte(out.String()), &p)
 
-			select {
-			case dataCh <- p:
-			default:
-				fmt.Printf("missed message: %v", p)
+				select {
+				case orderbook <- p:
+				default:
+				}
+
+			case TICKER:
+				p := Ticker{}
+				json.Unmarshal([]byte(out.String()), &p)
+
+				select {
+				case ticker <- p:
+				default:
+				}
 			}
 		}
 	}
@@ -248,7 +243,7 @@ func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, 
 		return err
 	}
 
-	if orderbook {
+	if orderbook != nil {
 		_, err := client.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_" + market + "_25"})
 		if err != nil {
 			return err
@@ -256,8 +251,8 @@ func (b *Bittrex) SubscribeExchangeUpdates(market string, dataCh chan<- Packet, 
 	}
 
 	select {
-	case <-stop:
 	case <-client.DisconnectedChannel:
 	}
+
 	return nil
 }

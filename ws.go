@@ -256,3 +256,111 @@ func (b *Bittrex) SubscribeUpdates(market string, ticker chan<- Ticker, orderboo
 
 	return nil
 }
+
+// SubscribeOrderUpdates func
+func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
+	const timeout = 15 * time.Second
+	client := signalr.NewWebsocketClient()
+
+	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
+
+		switch method {
+		case ORDER:
+		case HEARTBEAT:
+		case AUTHEXPIRED:
+			fmt.Printf("AUTHEXPIRED\n")
+		default:
+			//handle unsupported type
+			fmt.Printf("unsupported message type: %s\n", method)
+			return
+		}
+
+		for _, msg := range messages {
+
+			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))
+			if err != nil {
+				fmt.Printf("DecodeString error: %s %s\n", err.Error(), string(msg))
+				continue
+			}
+
+			r, err := zlib.NewReader(bytes.NewReader(append([]byte{120, 156}, dbuf...)))
+			if err != nil {
+				fmt.Printf("unzip error %s %s \n", err.Error(), string(msg))
+				continue
+			}
+			defer r.Close()
+
+			var out bytes.Buffer
+			io.Copy(&out, r)
+
+			p := Order{}
+
+			switch method {
+			case ORDER:
+				json.Unmarshal([]byte(out.String()), &p)
+			default:
+				//handle unsupported type
+				//fmt.Printf("unsupported message type: %v", p.Method)
+			}
+
+			select {
+			case dataCh <- p:
+			default:
+				fmt.Printf("missed message: %v", p)
+			}
+		}
+	}
+
+	client.OnMessageError = func(err error) {
+		fmt.Printf("ERROR OCCURRED: %s\n", err.Error())
+	}
+
+	err := doAsyncTimeout(
+		func() error {
+			return client.Connect("https", WSBASE, []string{WSHUB})
+		}, func(err error) {
+			if err == nil {
+				client.Close()
+			}
+		}, timeout)
+	if err != nil {
+		return err
+	}
+
+	defer client.Close()
+
+	_, err = b.Authentication(client)
+	if err != nil {
+		return err
+	}
+
+	_, err = client.CallHub(WSHUB, "IsAuthenticated")
+	if err != nil {
+		return err
+	}
+
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "order"})
+	if err != nil {
+		return err
+	}
+
+	/*	go func() {
+			ticker := time.NewTicker(8 * time.Minute)
+
+			for {
+				auth, err := b.Authentication(client)
+				if err != nil {
+					fmt.Printf("authentication error: %s - %s\n", auth, err)
+				}
+
+				<-ticker.C
+			}
+		}()
+	*/
+
+	select {
+	case <-client.DisconnectedChannel:
+	}
+
+	return nil
+}

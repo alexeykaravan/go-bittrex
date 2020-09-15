@@ -174,9 +174,9 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
 		switch method {
 		case ORDER:
 		case HEARTBEAT:
-			fmt.Printf("HEARTBEAT\n")
+			//fmt.Printf("HEARTBEAT\n")
 		case AUTHEXPIRED:
-			fmt.Printf("AUTHEXPIRED\n")
+			//fmt.Printf("AUTHEXPIRED\n")
 		default:
 			//handle unsupported type
 			fmt.Printf("unsupported message type: %s\n", method)

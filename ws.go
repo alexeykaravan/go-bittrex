@@ -258,12 +258,4 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
 			return err
 		}
 	}
-
-	/*select {
-	case <-client.DisconnectedChannel:
-	}
-
-	*/
-
-	//return fmt.Errorf("%s", "DisconnectedChannel")
 }

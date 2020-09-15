@@ -49,109 +49,10 @@ func doAsyncTimeout(f func() error, tmFunc func(error), timeout time.Duration) e
 	}
 }
 
-// StartListener func
-func (b *Bittrex) StartListener(dataCh chan<- Order) error {
-	const timeout = 15 * time.Second
-	client := signalr.NewWebsocketClient()
-
-	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
-
-		switch method {
-		case ORDERBOOK, TICKER, ORDER:
-		case HEARTBEAT:
-		case AUTHEXPIRED:
-			fmt.Printf("AUTHEXPIRED\n")
-		default:
-			//handle unsupported type
-			fmt.Printf("unsupported message type: %s\n", method)
-			return
-		}
-
-		for _, msg := range messages {
-
-			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))
-			if err != nil {
-				fmt.Printf("DecodeString error: %s %s\n", err.Error(), string(msg))
-				continue
-			}
-
-			r, err := zlib.NewReader(bytes.NewReader(append([]byte{120, 156}, dbuf...)))
-			if err != nil {
-				fmt.Printf("unzip error %s %s \n", err.Error(), string(msg))
-				continue
-			}
-			defer r.Close()
-
-			var out bytes.Buffer
-			io.Copy(&out, r)
-
-			p := Order{}
-
-			switch method {
-			case ORDER:
-				json.Unmarshal([]byte(out.String()), &p)
-			default:
-				//handle unsupported type
-				//fmt.Printf("unsupported message type: %v", p.Method)
-			}
-
-			select {
-			case dataCh <- p:
-			default:
-				fmt.Printf("missed message: %v", p)
-			}
-		}
-	}
-
-	client.OnMessageError = func(err error) {
-		fmt.Printf("ERROR OCCURRED: %s\n", err.Error())
-	}
-
-	err := doAsyncTimeout(
-		func() error {
-			return client.Connect("https", WSBASE, []string{WSHUB})
-		}, func(err error) {
-			if err == nil {
-				client.Close()
-			}
-		}, timeout)
-	if err != nil {
-		return err
-	}
-
-	_, err = b.Authentication(client)
-	if err != nil {
-		return err
-	}
-
-	_, err = client.CallHub(WSHUB, "IsAuthenticated")
-	if err != nil {
-		return err
-	}
-
-	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "order"})
-	if err != nil {
-		return err
-	}
-
-	go func() {
-		ticker := time.NewTicker(8 * time.Minute)
-
-		for {
-			auth, err := b.Authentication(client)
-			if err != nil {
-				fmt.Printf("authentication error: %s - %s\n", auth, err)
-			}
-
-			<-ticker.C
-		}
-	}()
-
-	return nil
-}
-
 //Authentication func
-func (b *Bittrex) Authentication(c *signalr.Client) ([]byte, error) {
+func (b *Bittrex) Authentication(c *signalr.Client) error {
+	r := &Responce{}
+
 	apiTimestamp := time.Now().UnixNano() / 1000000
 	UUID := uuid.New().String()
 
@@ -161,12 +62,18 @@ func (b *Bittrex) Authentication(c *signalr.Client) ([]byte, error) {
 	_, err := mac.Write([]byte(preSign))
 	sig := hex.EncodeToString(mac.Sum(nil))
 
-	_, err = c.CallHub(WSHUB, "Authenticate", b.client.apiKey, apiTimestamp, UUID, sig)
+	auth, err := c.CallHub(WSHUB, "Authenticate", b.client.apiKey, apiTimestamp, UUID, sig)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return nil, nil
+	_ = json.Unmarshal(auth, r)
+
+	if !r.Success {
+		return fmt.Errorf("%s", r.ErrorCode)
+	}
+
+	return nil
 }
 
 // SubscribeUpdates subscribes for updates of the market.
@@ -267,6 +174,7 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
 		switch method {
 		case ORDER:
 		case HEARTBEAT:
+			fmt.Printf("HEARTBEAT\n")
 		case AUTHEXPIRED:
 			fmt.Printf("AUTHEXPIRED\n")
 		default:
@@ -329,12 +237,7 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
 
 	defer client.Close()
 
-	_, err = b.Authentication(client)
-	if err != nil {
-		return err
-	}
-
-	_, err = client.CallHub(WSHUB, "IsAuthenticated")
+	err = b.Authentication(client)
 	if err != nil {
 		return err
 	}
@@ -344,23 +247,23 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
 		return err
 	}
 
-	/*	go func() {
-			ticker := time.NewTicker(8 * time.Minute)
+	ticker := time.NewTicker(5 * time.Minute)
 
-			for {
-				auth, err := b.Authentication(client)
-				if err != nil {
-					fmt.Printf("authentication error: %s - %s\n", auth, err)
-				}
+	for {
+		<-ticker.C
 
-				<-ticker.C
-			}
-		}()
-	*/
+		err := b.Authentication(client)
+		if err != nil {
+			fmt.Printf("authentication error: %s\n", err)
+			return err
+		}
+	}
 
-	select {
+	/*select {
 	case <-client.DisconnectedChannel:
 	}
 
-	return nil
+	*/
+
+	//return fmt.Errorf("%s", "DisconnectedChannel")
 }

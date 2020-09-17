@@ -1,6 +1,8 @@
 package bittrex
 
-import "github.com/shopspring/decimal"
+import (
+	"github.com/shopspring/decimal"
+)
 
 // Order struct
 type Order struct {
@@ -24,4 +26,26 @@ type Order struct {
 		Type string `json:"type"`
 		ID   string `json:"id"`
 	} `json:"orderToCancel"`
+}
+
+//OrderUpdate struct
+type OrderUpdate struct {
+	AccountID string `json:"accountId"`
+	Sequence  int    `json:"sequence"`
+	Delta     struct {
+		ID           string `json:"id"`
+		MarketSymbol string `json:"marketSymbol"`
+		Direction    string `json:"direction"`
+		Type         string `json:"type"`
+		Quantity     string `json:"quantity"`
+		Limit        string `json:"limit"`
+		TimeInForce  string `json:"timeInForce"`
+		FillQuantity string `json:"fillQuantity"`
+		Commission   string `json:"commission"`
+		Proceeds     string `json:"proceeds"`
+		Status       string `json:"status"`
+		CreatedAt    jTime  `json:"createdAt"`
+		UpdatedAt    *jTime `json:"updatedAt"`
+		ClosedAt     *jTime `json:"closedAt"`
+	} `json:"delta"`
 }

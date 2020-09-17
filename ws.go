@@ -165,7 +165,7 @@ func (b *Bittrex) SubscribeUpdates(market string, ticker chan<- Ticker, orderboo
 }
 
 // SubscribeOrderUpdates func
-func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
+func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- OrderUpdate) error {
 	const timeout = 15 * time.Second
 	client := signalr.NewWebsocketClient()
 
@@ -201,7 +201,7 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- Order) error {
 			var out bytes.Buffer
 			io.Copy(&out, r)
 
-			p := Order{}
+			p := OrderUpdate{}
 
 			switch method {
 			case ORDER:

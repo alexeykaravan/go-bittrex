@@ -76,16 +76,20 @@ func (b *Bittrex) Authentication(c *signalr.Client) error {
 	return nil
 }
 
-// SubscribeUpdates subscribes for updates of the market.
-// Updates will be sent to dataCh.
-// To stop subscription, send to, or close 'stop'.
-func (b *Bittrex) SubscribeUpdates(market string, ticker chan<- Ticker, orderbook chan<- OrderBook) error {
+// SubscribeTickerUpdates subscribes for updates of the market.
+func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) error {
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WSHUB {
 			return
+		}
+
+		switch method {
+		case TICKER:
+		default:
+			fmt.Printf("unsupported message type: %s\n", method)
 		}
 
 		for _, msg := range messages {
@@ -105,24 +109,12 @@ func (b *Bittrex) SubscribeUpdates(market string, ticker chan<- Ticker, orderboo
 			var out bytes.Buffer
 			io.Copy(&out, r)
 
-			switch method {
-			case ORDERBOOK:
-				p := OrderBook{}
-				json.Unmarshal([]byte(out.String()), &p)
+			p := Ticker{}
+			json.Unmarshal([]byte(out.String()), &p)
 
-				select {
-				case orderbook <- p:
-				default:
-				}
-
-			case TICKER:
-				p := Ticker{}
-				json.Unmarshal([]byte(out.String()), &p)
-
-				select {
-				case ticker <- p:
-				default:
-				}
+			select {
+			case ticker <- p:
+			default:
 			}
 		}
 	}
@@ -148,13 +140,6 @@ func (b *Bittrex) SubscribeUpdates(market string, ticker chan<- Ticker, orderboo
 	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market})
 	if err != nil {
 		return err
-	}
-
-	if orderbook != nil {
-		_, err := client.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_" + market + "_25"})
-		if err != nil {
-			return err
-		}
 	}
 
 	select {
@@ -258,4 +243,84 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- OrderUpdate) error {
 			return err
 		}
 	}
+}
+
+// SubscribeOrderbookUpdates subscribes for updates of the market.
+// Updates will be sent to dataCh.
+// To stop subscription, send to, or close 'stop'.
+func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- OrderBook) error {
+	const timeout = 5 * time.Second
+	client := signalr.NewWebsocketClient()
+
+	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
+		if hub != WSHUB {
+			return
+		}
+
+		switch method {
+		case ORDERBOOK:
+		default:
+			fmt.Printf("unsupported message type: %s\n", method)
+		}
+
+		for _, msg := range messages {
+			dbuf, err := base64.StdEncoding.DecodeString(strings.Trim(string(msg), `"`))
+			if err != nil {
+				fmt.Printf("DecodeString error: %s %s\n", err.Error(), string(msg))
+				continue
+			}
+
+			r, err := zlib.NewReader(bytes.NewReader(append([]byte{120, 156}, dbuf...)))
+			if err != nil {
+				fmt.Printf("unzip error %s %s \n", err.Error(), string(msg))
+				continue
+			}
+			defer r.Close()
+
+			var out bytes.Buffer
+			io.Copy(&out, r)
+
+			p := OrderBook{}
+			err = json.Unmarshal([]byte(out.String()), &p)
+			if err != nil {
+				fmt.Printf("orderbook Unmarshal err: %s %s\n", err.Error(), market)
+			}
+
+			select {
+			case orderbook <- p:
+			default:
+				fmt.Printf("orderbook send err: %s \n", market)
+			}
+
+		}
+	}
+
+	client.OnMessageError = func(err error) {
+		fmt.Printf("ERROR OCCURRED: %s\n", err.Error())
+	}
+
+	err := doAsyncTimeout(
+		func() error {
+			return client.Connect("https", WSBASE, []string{WSHUB})
+		}, func(err error) {
+			if err == nil {
+				client.Close()
+			}
+		}, timeout)
+	if err != nil {
+		return err
+	}
+
+	defer client.Close()
+
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_" + market + "_25"})
+	if err != nil {
+		return err
+	}
+
+	select {
+	case <-client.DisconnectedChannel:
+	}
+
+	return nil
 }

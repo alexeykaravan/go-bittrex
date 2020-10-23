@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,13 +82,18 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 
+	var updTime int64
+
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WSHUB {
 			return
 		}
 
 		switch method {
+		case HEARTBEAT:
 		case TICKER:
+			atomic.StoreInt64(&updTime, time.Now().Unix())
+
 		default:
 			fmt.Printf("unsupported message type: %s\n", method)
 		}
@@ -137,16 +143,24 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 
 	defer client.Close()
 
-	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"ticker_" + market})
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "ticker_" + market})
 	if err != nil {
 		return err
 	}
 
-	select {
-	case <-client.DisconnectedChannel:
-	}
+	tick := time.NewTicker(1 * time.Minute)
 
-	return nil
+	for {
+		select {
+		case <-client.DisconnectedChannel:
+			return errors.New("client.DisconnectedChannel")
+		case <-tick.C:
+
+			if time.Now().Unix()-atomic.LoadInt64(&updTime) > 60 {
+				return errors.New("messages timeout")
+			}
+		}
+	}
 }
 
 // SubscribeOrderUpdates func
@@ -252,13 +266,17 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 
+	var updTime int64
+
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WSHUB {
 			return
 		}
 
 		switch method {
+		case HEARTBEAT:
 		case ORDERBOOK:
+			atomic.StoreInt64(&updTime, time.Now().Unix())
 		default:
 			fmt.Printf("unsupported message type: %s\n", method)
 		}
@@ -313,14 +331,22 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 
 	defer client.Close()
 
-	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"orderbook_" + market + "_25"})
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "orderbook_" + market + "_25"})
 	if err != nil {
 		return err
 	}
 
-	select {
-	case <-client.DisconnectedChannel:
-	}
+	ticker := time.NewTicker(5 * time.Minute)
 
-	return nil
+	for {
+		select {
+		case <-client.DisconnectedChannel:
+			return errors.New("client.DisconnectedChannel")
+		case <-ticker.C:
+
+			if time.Now().Unix()-atomic.LoadInt64(&updTime) > 5*60 {
+				return errors.New("messages timeout")
+			}
+		}
+	}
 }

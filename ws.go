@@ -90,8 +90,7 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 		}
 
 		switch method {
-		case HEARTBEAT:
-		case TICKER:
+		case HEARTBEAT, TICKER:
 			atomic.StoreInt64(&updTime, time.Now().Unix())
 
 		default:
@@ -155,9 +154,8 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 		case <-client.DisconnectedChannel:
 			return errors.New("client.DisconnectedChannel")
 		case <-tick.C:
-
 			if time.Now().Unix()-atomic.LoadInt64(&updTime) > 60 {
-				return errors.New("messages timeout")
+				return errors.New("ticker messages timeout")
 			}
 		}
 	}
@@ -274,8 +272,7 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 		}
 
 		switch method {
-		case HEARTBEAT:
-		case ORDERBOOK:
+		case HEARTBEAT, ORDERBOOK:
 			atomic.StoreInt64(&updTime, time.Now().Unix())
 		default:
 			fmt.Printf("unsupported message type: %s\n", method)
@@ -336,7 +333,7 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 		return err
 	}
 
-	ticker := time.NewTicker(5 * time.Minute)
+	ticker := time.NewTicker(1 * time.Minute)
 
 	for {
 		select {
@@ -344,8 +341,8 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 			return errors.New("client.DisconnectedChannel")
 		case <-ticker.C:
 
-			if time.Now().Unix()-atomic.LoadInt64(&updTime) > 5*60 {
-				return errors.New("messages timeout")
+			if time.Now().Unix()-atomic.LoadInt64(&updTime) > 60 {
+				return errors.New("orderbook messages timeout")
 			}
 		}
 	}

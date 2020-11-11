@@ -26,6 +26,8 @@ const (
 	TICKER = "ticker"
 	//ORDER const
 	ORDER = "order"
+	//TRADE const
+	TRADE = "trade"
 	//HEARTBEAT const
 	HEARTBEAT = "heartbeat"
 	//AUTHEXPIRED const

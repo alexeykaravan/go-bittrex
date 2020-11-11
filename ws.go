@@ -264,19 +264,15 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 
-	var updTime int64
-
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WSHUB {
 			return
 		}
 
 		switch method {
-		case HEARTBEAT:
-		case ORDERBOOK:
-			atomic.StoreInt64(&updTime, time.Now().Unix())
+		case HEARTBEAT, ORDERBOOK:
 		default:
-			fmt.Printf("unsupported message type: %s\n", method)
+			fmt.Printf("unsupported message type: %s %v\n", method, messages)
 		}
 
 		for _, msg := range messages {
@@ -297,6 +293,16 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 			io.Copy(&out, r)
 
 			p := OrderBook{}
+
+			switch method {
+			case ORDER:
+				json.Unmarshal([]byte(out.String()), &p)
+			default:
+
+				//handle unsupported type
+				//fmt.Printf("%s\n", out.String())
+			}
+
 			err = json.Unmarshal([]byte(out.String()), &p)
 			if err != nil {
 				fmt.Printf("orderbook Unmarshal err: %s %s\n", err.Error(), market)
@@ -334,17 +340,8 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 		return err
 	}
 
-	ticker := time.NewTicker(5 * time.Minute)
-
-	for {
-		select {
-		case <-client.DisconnectedChannel:
-			return errors.New("client.DisconnectedChannel")
-		case <-ticker.C:
-
-			if time.Now().Unix()-atomic.LoadInt64(&updTime) > 5*60 {
-				return errors.New("orderbook messages timeout")
-			}
-		}
+	select {
+	case <-client.DisconnectedChannel:
+		return errors.New("client.DisconnectedChannel")
 	}
 }

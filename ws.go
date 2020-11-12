@@ -120,6 +120,7 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 			select {
 			case ticker <- p:
 			default:
+				fmt.Printf("ticker send err: %s %d \n", market, len(ticker))
 			}
 		}
 	}

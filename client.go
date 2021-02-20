@@ -25,7 +25,7 @@ type Client struct {
 
 // NewClient return a new Bittrex HTTP client
 func NewClient(apiKey, apiSecret string) (c *Client) {
-	return &Client{apiKey, apiSecret, &http.Client{}, 30 * time.Second, false}
+	return &Client{apiKey, apiSecret, &http.Client{}, 1 * time.Second, false}
 }
 
 // NewClientWithCustomHTTPConfig returns a new Bittrex HTTP client using the predefined http client

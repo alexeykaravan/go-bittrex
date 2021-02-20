@@ -261,7 +261,7 @@ func (b *Bittrex) SubscribeOrderUpdates(dataCh chan<- OrderUpdate) error {
 // SubscribeOrderbookUpdates subscribes for updates of the market.
 // Updates will be sent to dataCh.
 // To stop subscription, send to, or close 'stop'.
-func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- OrderBook) error {
+func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- OrderBook, stop chan struct{}) error {
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 
@@ -312,7 +312,7 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 			select {
 			case orderbook <- p:
 			default:
-				fmt.Printf("orderbook send err: %s \n", market)
+				fmt.Printf("orderbook send err: %s %d  \n", market, len(orderbook))
 			}
 
 		}
@@ -344,5 +344,7 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 	select {
 	case <-client.DisconnectedChannel:
 		return errors.New("client.DisconnectedChannel")
+	case <-stop:
+		return errors.New("StopChannel")
 	}
 }

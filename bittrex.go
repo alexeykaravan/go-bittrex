@@ -96,15 +96,23 @@ func (b *Bittrex) GetOrderBook(book *OrderBook) (err error) {
 		return
 	}
 
-	//book2 := &OrderBook2{}
-	err = json.Unmarshal(body, book)
+	book2 := &OrderBook2{}
+	err = json.Unmarshal(body, book2)
 	if err != nil {
 		return
 	}
 
 	book.Sequence, _ = strconv.Atoi(resp.Header.Get("Sequence"))
-	//book.BidDeltas = book2.BidDeltas
-	//book.AskDeltas = book2.AskDeltas
+	book.BidDeltas = nil
+	book.AskDeltas = nil
+
+	for _, val := range book2.BidDeltas {
+		book.BidDeltas = append(book.BidDeltas, val)
+	}
+
+	for _, val := range book2.AskDeltas {
+		book.AskDeltas = append(book.AskDeltas, val)
+	}
 
 	return
 }

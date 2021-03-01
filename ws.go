@@ -265,6 +265,8 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 	const timeout = 5 * time.Second
 	client := signalr.NewWebsocketClient()
 
+	var updTime time.Time
+
 	client.OnClientMethod = func(hub string, method string, messages []json.RawMessage) {
 		if hub != WSHUB {
 			return
@@ -272,6 +274,7 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 
 		switch method {
 		case HEARTBEAT, ORDERBOOK:
+			updTime = time.Now()
 		default:
 			fmt.Printf("unsupported message type: %s %v\n", method, messages)
 		}
@@ -341,10 +344,19 @@ func (b *Bittrex) SubscribeOrderbookUpdates(market string, orderbook chan<- Orde
 		return err
 	}
 
-	select {
-	case <-client.DisconnectedChannel:
-		return errors.New("client.DisconnectedChannel")
-	case <-stop:
-		return errors.New("StopChannel")
+	tick := time.NewTicker(1 * time.Minute)
+
+	for {
+		select {
+		case <-client.DisconnectedChannel:
+			return errors.New("client.DisconnectedChannel")
+		case <-stop:
+			return errors.New("StopChannel")
+		case <-tick.C:
+			if time.Now().Sub(updTime) > time.Minute {
+				return errors.New("orderook messages timeout")
+			}
+		}
+
 	}
 }

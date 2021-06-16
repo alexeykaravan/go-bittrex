@@ -90,7 +90,7 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 		}
 
 		switch method {
-		case HEARTBEAT, TICKER:
+		case HEARTBEAT, TICKER, TRADE:
 			atomic.StoreInt64(&updTime, time.Now().Unix())
 
 		default:
@@ -113,6 +113,8 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 
 			var out bytes.Buffer
 			io.Copy(&out, r)
+
+			fmt.Println(out.String())
 
 			p := Ticker{}
 			json.Unmarshal([]byte(out.String()), &p)
@@ -143,7 +145,7 @@ func (b *Bittrex) SubscribeTickerUpdates(market string, ticker chan<- Ticker) er
 
 	defer client.Close()
 
-	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "ticker_" + market})
+	_, err = client.CallHub(WSHUB, "Subscribe", []interface{}{"heartbeat", "ticker_" + market, "trade_" + market})
 	if err != nil {
 		return err
 	}
